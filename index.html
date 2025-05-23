@@ -1,123 +1,147 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link href="styles.css" rel="stylesheet"/>
-    <title>Choropleth Map</title>
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-  </head>
-  <body>
-    <div id="chart-container"></div>
-    <script>
-      
-      fetch("https://raw.githubusercontent.com/freeCodeCamp/ProjectReferenceData/master/GDP-data.json")
-        .then(response => response.json())
-        .then(jsonData => {
-          drawChart(jsonData.data); 
-        });
+<head>
+  <meta charset="UTF-8">
+  <title>Choropleth Map</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://unpkg.com/topojson-client@3"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
 
-      function drawChart(data) {
-        const width = 900;
-        const height = 500;
-        const margin = { top: 50, right: 100, bottom: 50, left: 60 };
-        const innerWidth = width - margin.left - margin.right;
-        const innerHeight = height - margin.top - margin.bottom;
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      font-family: sans-serif;
+    }
 
-        const svg = d3.select("#chart-container")
-          .append("svg")
-          .attr("width", width)
-          .attr("height", height);
+    #container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      max-width: 960px;
+    }
 
-        const dates = data.map(d => new Date(d[0]));
+    svg {
+      display: block;
+    }
 
-        const xScale = d3.scaleTime()
-          .domain([d3.min(dates), d3.max(dates)])
-          .range([0, innerWidth]);
+    .tooltip {
+      position: absolute;
+      background: white;
+      padding: 5px;
+      border: 1px solid #ccc;
+      pointer-events: none;
+      font-size: 14px;
+      border-radius: 4px;
+      opacity: 0;
+    }
 
-        const yScale = d3.scaleLinear()
-          .domain([0, d3.max(data, d => d[1])])
-          .range([innerHeight, 0]);
+    h1, p {
+      margin: 0.5em 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <h1 id="title">United States Educational Attainment</h1>
+    <p id="description">Percentage of adults age 25 and older with a bachelor's degree or higher (2010–2014)</p>
+    <svg width="960" height="600"></svg>
+    <div id="tooltip" class="tooltip"></div>
+  </div>
 
-        const chart = svg.append("g")
-          .attr("transform", `translate(${margin.left},${margin.top})`);
+  <script>
+    const width = 960;
+    const height = 600;
 
-        svg.append("text")
-          .attr("id", 'title')
-          .attr("x", width / 2)
-          .attr("y", margin.top / 2)
-          .attr("text-anchor", "middle")
-          .attr("fill", "rgb(230,230,230)")
-          .text("United States GDP");
-        
-        // x-axis
-        chart.append("g")
-          .attr("id", "x-axis")
-          .attr("transform", `translate(0, ${innerHeight})`)
-          .call(d3.axisBottom(xScale));
-        // y-axis
-        chart.append("g")
-          .attr("id", "y-axis")
-          .call(d3.axisLeft(yScale));
+    const svg = d3.select("svg");
+    const tooltip = d3.select("#tooltip");
 
-        const barWidth = innerWidth / data.length;
-        
-        // bars
-        chart.selectAll("rect")
-          .data(data)
-          .enter()
-          .append("rect")
-          .attr("class", "bar")
-          .attr("x", d => xScale(new Date(d[0])))
-          .attr("y", d => yScale(d[1]))
-          .attr("width", barWidth)
-          .attr("height", d => innerHeight - yScale(d[1]))
-          .attr("fill", "rgb(154, 189, 192)")
-          .attr("data-date", d => d[0])
-          .attr("data-gdp", d => d[1]);
+    Promise.all([
+      d3.json("https://cdn.freecodecamp.org/testable-projects-fcc/data/choropleth_map/counties.json"),
+      d3.json("https://cdn.freecodecamp.org/testable-projects-fcc/data/choropleth_map/for_user_education.json")
+    ]).then(([topoData, educationData]) => {
+      const counties = topojson.feature(topoData, topoData.objects.counties).features;
+      const educationMap = new Map(educationData.map(d => [d.fips, d]));
 
-        const tooltip = d3.select("body")
-          .append("div")
-          .attr("id", "tooltip")
-          .style("position", "absolute")
-          .style("visibility", "hidden")
-          .style("background-color", "rgb(15, 50, 53)")
-          .style("padding", "5px")
-          .style("border-radius", "4px");
+      const color = d3.scaleThreshold()
+        .domain([15, 30, 45, 60])
+        .range(d3.schemeBlues[5]);
 
-        chart.selectAll("rect")
-          .on("mouseover", function (event, d) {
-            tooltip
-              .style("visibility", "visible")
-              .attr("data-date", d[0])
-              .html(`Date: ${d[0]}<br>GDP: $${d[1]} Billion`);
-          })
-          .on("mousemove", function (event) {
-            tooltip
-              .style("top", (event.pageY - 50) + "px")
-              .style("left", (event.pageX + 10) + "px");
-          })
-          .on("mouseout", function () {
-            tooltip.style("visibility", "hidden");
-          });
-      }
-    </script>
-    <style>
-      body {
-        background-color: rgb(19, 33, 34);
-        color: rgb(230,230,230);
-        font-family: 'Quicksand', sans-serif;
-      }
-      #chart-container {
-        display: flex;
-        justify-content: center; 
-        align-items: center;  
-        flex-direction: column;
-      }
-      .tick text {
-        font-size: 15px;
-      }
-    </style>
-    <script src="https://cdn.freecodecamp.org/testable-projects-fcc/v1/bundle.js"></script>
-  </body>
+      const path = d3.geoPath();
+
+      svg.selectAll("path")
+        .data(counties)
+        .join("path")
+        .attr("class", "county")
+        .attr("d", path)
+        .attr("fill", d => {
+          const edu = educationMap.get(d.id);
+          return edu ? color(edu.bachelorsOrHigher) : "#ccc";
+        })
+        .attr("stroke", "#fff")
+        .attr("stroke-width", 0.3)
+        .attr("data-fips", d => d.id)
+        .attr("data-education", d => {
+          const edu = educationMap.get(d.id);
+          return edu ? edu.bachelorsOrHigher : 0;
+        })
+        .on("mouseover", (event, d) => {
+          const edu = educationMap.get(d.id);
+          tooltip
+            .style("opacity", 1)
+            .style("left", (event.pageX + 10) + "px")
+            .style("top", (event.pageY - 28) + "px")
+            .html(`${edu.area_name}, ${edu.state}<br>${edu.bachelorsOrHigher}%`)
+            .attr("data-education", edu.bachelorsOrHigher);
+        })
+        .on("mouseout", () => tooltip.style("opacity", 0));
+
+      // Legend
+      const legendWidth = 300;
+      const legendHeight = 10;
+      const legendX = 330;
+      const legendY = 550;
+
+      const legend = svg.append("g")
+        .attr("id", "legend")
+        .attr("transform", `translate(${legendX}, ${legendY})`);
+
+      const legendScale = d3.scaleLinear()
+        .domain([d3.min(color.domain()), d3.max(color.domain())])
+        .range([0, legendWidth]);
+
+      const legendAxis = d3.axisBottom(legendScale)
+        .tickValues(color.domain())
+        .tickFormat(d => `${d}%`)
+        .tickSize(13);
+
+      legend.selectAll("rect")
+        .data(color.range().map((d, i) => {
+          const domain = color.invertExtent(d);
+          if (!domain[0]) domain[0] = legendScale.domain()[0];
+          if (!domain[1]) domain[1] = legendScale.domain()[1];
+          return {
+            color: d,
+            x0: legendScale(domain[0]),
+            x1: legendScale(domain[1])
+          };
+        }))
+        .join("rect")
+        .attr("height", legendHeight)
+        .attr("x", d => d.x0)
+        .attr("width", d => d.x1 - d.x0)
+        .attr("fill", d => d.color);
+
+      legend.call(legendAxis)
+        .select(".domain").remove();
+    });
+  </script>
+
+  <script src="https://cdn.freecodecamp.org/testable-projects-fcc/v1/bundle.js"></script>
+</body>
 </html>
